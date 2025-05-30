@@ -2,16 +2,25 @@
 
 # importing Libraries
 import pandas as pd
+
 import numpy as np
+
 import yfinance as yf
+
 import matplotlib.pyplot as plt
+
 import shap
+
 import joblib
+
 from datetime import datetime
 
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+
 from xgboost import XGBClassifier
+
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+
 from sklearn.preprocessing import StandardScaler
 
 from indicators import add_indicators  # your existing indicators module
@@ -20,7 +29,10 @@ from indicators import add_indicators  # your existing indicators module
 # In a real-world scenario, you'd expand this with more categories (e.g., 'Banking', 'IT', 'Pharma')
 # and populate them with relevant symbols.
 STOCK_CATEGORIES = {
-    'Nifty 50': {
+   
+'Nifty 50': 
+
+{
         'Adani Enterprises': 'ADANIENT.NS',
         'Adani Ports & SEZ': 'ADANIPORTS.NS',
         'Apollo Hospitals': 'APOLLOHOSP.NS',
@@ -74,29 +86,45 @@ STOCK_CATEGORIES = {
 }
 
 def prepare_data(stock_symbol, start_date="2010-01-01", end_date=datetime.now().strftime('%Y-%m-%d')):
-    """Downloads data, adds indicators, creates lagged features, and prepares target variable."""
-    print(f"📥 Downloading data for {stock_symbol}...")
-    df = yf.download(stock_symbol, start=start_date, end=end_date, auto_adjust=True)
-    if df.empty:
-        print(f"Skipping {stock_symbol} due to no data found.")
+
+ """Downloads data, adds indicators, creates lagged features, and prepares target variable."""
+ 
+print(f"📥 Downloading data for {stock_symbol}...")
+
+ df = yf.download(stock_symbol, start=start_date, end=end_date, auto_adjust=True)
+ 
+if df.empty:
+
+ print(f"Skipping {stock_symbol} due to no data found.")
         return None, None, None, None
 
     # Add technical indicators using your module
+    
   df = add_indicators(df)
 
     # Create additional features - lagged features for momentum capture
+    
   df['Close_lag_1'] = df['Close'].shift(1)
+  
   df['Close_lag_2'] = df['Close'].shift(2)
+  
   df['Close_lag_3'] = df['Close'].shift(3)
     
     # Target: classify next day's return with threshold
     # 1 if next day's close is > 1% higher, 0 if < -1% lower, NaN otherwise
+    
   df['Target'] = np.where(
-        (df['Close'].shift(-1) - df['Close']) / df['Close'] > 0.01, 1,
-        np.where((df['Close'].shift(-1) - df['Close']) / df['Close'] < -0.01, 0, np.nan)
-    )
+  
+ (df['Close'].shift(-1) - df['Close']) / df['Close'] > 0.01, 1,
+ 
+ np.where((df['Close'].shift(-1) - df['Close']) / df['Close'] < -0.01, 0, np.nan)
+ 
+)
+
    df.dropna(inplace=True)
-    features = [
+   
+ features =
+ [
         'RSI', 'SMA_20', 'SMA_50', 'EMA_20', 'MACD', 'MACD_Signal',
         'Stoch_K', 'Stoch_D', 'Volume_SMA_20', 'Daily_Return', 'Momentum',
         'BB_Upper', 'BB_Lower', 'ATR',
@@ -105,32 +133,49 @@ def prepare_data(stock_symbol, start_date="2010-01-01", end_date=datetime.now().
 
     # Filter features that might not have been created by add_indicators (e.g., if data is too short)
     available_features = [f for f in features if f in df.columns]
+    
    X = df[available_features]
-    y = df['Target']
-    if X.empty or y.empty:
-        print(f"Skipping {stock_symbol} due to insufficient data after feature creation or NaN handling.")
+   
+ y = df['Target']
+ 
+ if X.empty or y.empty:
+ 
+ print(f"Skipping {stock_symbol} due to insufficient data after feature creation or NaN handling.")
         return None, None, None, None
 
     # Remove highly correlated features (>0.9) to reduce multicollinearity
+    
   corr_matrix = X.corr().abs()
-    upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
-    to_drop = [col for col in upper.columns if any(upper[col] > 0.9)]
-    if to_drop:
-        print(f"🧹 Removing correlated features for {stock_symbol}: {to_drop}")
+  
+upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+
+ to_drop = [col for col in upper.columns if any(upper[col] > 0.9)]
+ 
+if to_drop:
+
+  print(f"🧹 Removing correlated features for {stock_symbol}: {to_drop}")
         X = X.drop(columns=to_drop)
 
     # Scale features
+    
    scaler = StandardScaler()
-    X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns, index=X.index)
-    return X_scaled, y, df, scaler
+   
+  X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns, index=X.index)
+  
+  return X_scaled, y, df, scaler
 
 def train_model(X, y, model_save_path='stock_model_improved.joblib',
                 feature_importance_path='feature_importance_improved.png',
                 shap_summary_path='shap_summary_improved.png'):
-    """Trains an XGBoost model using TimeSeriesSplit and GridSearchCV."""
-    print("🧪 Training model with TimeSeriesSplit and GridSearchCV...")
-    tscv = TimeSeriesSplit(n_splits=5)
-    params = {
+                
+"""Trains an XGBoost model using TimeSeriesSplit and GridSearchCV."""
+
+print("🧪 Training model with TimeSeriesSplit and GridSearchCV...")
+
+  tscv = TimeSeriesSplit(n_splits=5)
+  
+ params =
+ {
         'n_estimators': [300, 500],
         'max_depth': [4, 6, 8],
         'learning_rate': [0.01, 0.05],
@@ -140,36 +185,51 @@ def train_model(X, y, model_save_path='stock_model_improved.joblib',
         'reg_alpha': [0, 0.1],
         'reg_lambda': [1, 2],
     }
-    xgb = XGBClassifier(
+    
+xgb = XGBClassifier(
         objective='binary:logistic',
         eval_metric='logloss',
         random_state=42,
         n_jobs=-1
     )
-    grid = GridSearchCV(xgb, params, cv=tscv, scoring='accuracy', verbose=0, n_jobs=-1)
-    grid.fit(X, y)
-    print(f"✅ Best Params: {grid.best_params_}")
-    best_model = grid.best_estimator_
+
+ grid = GridSearchCV(xgb, params, cv=tscv, scoring='accuracy', verbose=0, n_jobs=-1)
+ 
+grid.fit(X, y)
+
+ print(f"✅ Best Params: {grid.best_params_}")
+ 
+best_model = grid.best_estimator_
 
     # Last fold train-test split for performance metrics
+    
   train_idx, test_idx = list(tscv.split(X))[-1]
-    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+  
+   X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+   
+y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
    y_pred = best_model.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    print(f"🎯 Model Accuracy on test fold: {acc * 100:.2f}%")
-    print("\n📊 Classification Report:")
-    print(classification_report(y_test, y_pred))
+   
+acc = accuracy_score(y_test, y_pred)
+
+print(f"🎯 Model Accuracy on test fold: {acc * 100:.2f}%")
+
+print("\n📊 Classification Report:")
+   
+  print(classification_report(y_test, y_pred))
 
     # Save model
+    
   joblib.dump(best_model, model_save_path)
-    print(f"💾 Model saved as {model_save_path}")
+  
+print(f"💾 Model saved as {model_save_path}")
 
    # Feature importance plot
    
   plt.figure(figsize=(10, 6))
-    feature_imp = pd.Series(best_model.feature_importances_, index=X.columns)
+  
+feature_imp = pd.Series(best_model.feature_importances_, index=X.columns)
     feature_imp.sort_values().plot(kind='barh')
     plt.title("Feature Importance")
     plt.tight_layout()
@@ -186,7 +246,8 @@ def train_model(X, y, model_save_path='stock_model_improved.joblib',
     try:
     
   explainer = shap.TreeExplainer(best_model)
-        shap_values = explainer.shap_values(X_test)
+  
+shap_values = explainer.shap_values(X_test)
         plt.figure()
         shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
         plt.tight_layout()
@@ -199,6 +260,7 @@ def train_model(X, y, model_save_path='stock_model_improved.joblib',
 
 def predict_next_day(model, scaler, latest_data, feature_names):
     """Predicts the next day's stock movement and provides investment advice."""
+    
     # Ensure latest_data is a DataFrame with correct index and columns
     latest_features = latest_data[feature_names].to_frame().T
     
